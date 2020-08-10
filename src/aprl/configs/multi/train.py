@@ -338,6 +338,19 @@ def make_configs(multi_train_ex):
         del _
 
     @multi_train_ex.named_config
+    def paper_ysnp(train):
+        """Final experiments for paper. Like best_guess but more seeds & timesteps."""
+        train = dict(train)
+        _sparse_reward(train)
+        _best_guess_train(train)
+        train["total_timesteps"] = int(20e6)
+        spec = _best_guess_spec(envs=['multicomp/YouShallNotPassHumans-v0'])
+        spec["config"]["seed"] = tune.grid_search(list(range(5)))
+        exp_name = "paper_ysnp"
+        _ = locals()  # quieten flake8 unused variable warning
+        del _
+
+    @multi_train_ex.named_config
     def dec2018rep(train):
         """Reproduce results from December 2018 draft paper with new codebase."""
         train = dict(train)

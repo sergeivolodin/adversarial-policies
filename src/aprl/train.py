@@ -5,7 +5,9 @@ import json
 import logging
 import os
 import os.path as osp
+import numpy as np
 import pkgutil
+import numpy as np
 from typing import Callable, Iterable
 
 from gym.spaces import Box
@@ -14,6 +16,7 @@ from sacred.observers import FileStorageObserver
 import stable_baselines
 from stable_baselines.common import callbacks
 from stable_baselines.common.vec_env.vec_normalize import VecNormalize
+from stable_baselines.common.noise import NormalActionNoise
 import tensorflow as tf
 
 from aprl.common import utils
@@ -269,6 +272,22 @@ def ppo2(batch_size, num_env, learning_rate, **kwargs):
         **kwargs,
     )
 
+@train_ex.capture
+def td3(batch_size, num_env, learning_rate, **kwargs):
+    n_actions = 17
+    noise_std = 0.1
+    return _stable(
+        stable_baselines.TD3,
+        our_type="td3",
+        callback_key="update",
+        callback_mul=batch_size,
+        #n_steps=batch_size // num_env,
+        learning_rate=learning_rate,
+        action_noise=NormalActionNoise(mean=np.zeros(n_actions),
+                                       sigma=noise_std * np.ones(n_actions)),
+        **kwargs,
+    )
+
 
 @train_ex.capture
 def sac(batch_size, learning_rate, **kwargs):
@@ -384,12 +403,20 @@ def no_embed():
     del _
 
 
+
 PAPER_HYPERPARAMS = dict(
     total_timesteps=int(20e6),
     batch_size=16384,
     learning_rate=3e-4,
     rl_args=dict(ent_coef=0.0, nminibatches=4, noptepochs=4),
 )
+
+#PAPER_HYPERPARAMS = dict(
+#    total_timesteps=int(20e6),
+#    batch_size=2048,
+#    learning_rate=1e-3,
+#    rl_args=dict(buffer_size=1000000, learning_starts=10000, train_freq=1000, gradient_steps=1000),
+#)
 
 SPARSE_REWARD = dict(rew_shape=True, rew_shape_params=dict(anneal_frac=0.0))
 
@@ -637,6 +664,7 @@ def single_wrappers(
 RL_ALGOS = {
     "ppo2": ppo2,
     "old_ppo2": old_ppo2,
+    "td3": td3,
 }
 MPI_RL_ALGOS = {
     "gail": gail,
@@ -653,7 +681,7 @@ except ImportError:
     RL_ALGOS.update({k: mpi_unavailable_error for k in MPI_RL_ALGOS})
 
 # True for Stable Baselines as of 2019-03
-NO_VECENV = ["ddpg", "dqn", "gail", "her", "ppo1", "sac"]
+NO_VECENV = ["ddpg", "dqn", "gail", "her", "ppo1", "sac", "td3"]
 
 
 def resolve_embed(embed_type, embed_path, embed_types, embed_paths, adv_noise_params):
